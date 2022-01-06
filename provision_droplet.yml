@@ -1,0 +1,137 @@
+---
+
+- name: PROVISION DROPLETS
+  hosts: droplets
+  connection: ssh
+  gather_facts: no
+  become: yes
+  collections:
+    - kubernetes.core
+  vars:
+    ansible_ssh_private_key_file: /root/.ssh/ubuntu_rsa
+
+
+  tasks:
+
+    - name: Update repositorie for install python3
+      shell: "{{ item }}"
+      ignore_errors: yes
+      loop:
+        - sudo apt update
+        - sudo apt -y upgrade
+    - name: Install pip3 & Install VirtualBox
+      apt:
+        pkg:
+          - python3-pip
+          - virtualbox
+        state: present
+    
+    - name: Download minikube
+      get_url:
+        url: https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        dest: /usr/local/bin/minikube
+        mode: 755
+    
+    - name: Install Kubectl
+      shell: curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
+    
+    - name: Make the kubectl binary executable
+      shell: chmod +x ./kubectl
+    
+    - name: Move the binary in to PATH
+      shell: sudo mv ./kubectl /usr/local/bin/kubectl
+    
+    - name: Install bottle for Python 3.3 specifically, using the 'pip3.3' executable
+      pip:
+        name: ansible
+        executable: pip3
+
+    - name: Install Docker Io
+      apt:
+        pkg: 
+          - docker.io
+        state: present
+        update_cache: yes
+
+    - name: Curl minikube
+      shell: curl -Lo minikube https://github.com/kubernetes/minikube/releases/download/v1.21.0/minikube-linux-amd64 && chmod +x minikube &&  sudo mv minikube /usr/local/bin/
+    
+    - name: Change Mod Docker $USER
+      shell: usermod -aG docker $USER
+    
+    - name: Star Minikube
+      tags: awx
+      command: minikube start --addons=ingress --cpus=2 --install-addons=true --kubernetes-version=stable --memory=6g --force
+
+    - name: Pause for 4 minutes to AWX service
+      tags: awx
+      pause:
+        minutes: 4
+    
+    - name: Get PODS from AWX
+      tags: awx
+      shell: kubectl get nodes
+    
+    - name: Apply Kubernete AWX
+      tags: awx
+      shell: kubectl apply -f https://raw.githubusercontent.com/ansible/awx-operator/0.10.0/deploy/awx-operator.yaml
+
+    - name: Waiting for applying kubernete 
+      tags: awx
+      pause:
+        minutes: 2
+    
+    - name: Get PODS for kubernete
+      tags: awx
+      shell: kubectl get pods
+    
+    - name: Copy file awx-demo.yml
+      tags: awx
+      ansible.builtin.copy:
+        src: /home/ilana/ansible/digitalocean/ansible-awx.yml
+        dest: .
+    
+    - name: Ls for awx-demo.yml
+      tags: awx-demo
+      shell: ls
+
+    - name: Apply awx-demo.yml to kubernete
+      tags: awx-execute
+      shell: kubectl apply -f ansible-awx.yml
+    
+    - name: Waiting for applying awx-demo.yml
+      tags: awx-execute
+      pause:
+        minutes: 2
+    
+    - name: Get PODS app kubernete awx-operator
+      tags: awx-execute
+      shell: kubectl get pods -l "app.kubernetes.io/managed-by=awx-operator"
+    
+    - name: Expose deployment awx-demo
+      tags: awx-execute
+      shell: kubectl expose deployment awx-demo --type=LoadBalancer --port=8080
+
+    - name: Copy Makefile
+      tags: awx-tunnel
+      ansible.builtin.copy:
+        src: /home/ilana/ansible/digitalocean/Makefile
+        dest: .
+    
+    - name: Copy Test.py
+      tags: script
+      ansible.builtin.copy:
+        src: /home/ilana/ansible/digitalocean/test.py
+        dest: .
+
+    - name: Run a script using an executable in a system path
+      script: test.py
+      tags: script
+      args:
+        executable: python3
+
+
+    
+
+    
+    

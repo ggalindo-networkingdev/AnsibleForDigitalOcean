@@ -1,0 +1,9 @@
+
+[droplets]
+{% for server in my_droplet['results'] %}
+{% for server_ip in server['data']['droplet']['networks']['v4'] %}
+{% if server_ip['type'] == 'public' %}
+{{ server_ip['ip_address'] }}
+{% endif %}
+{% endfor %}
+{% endfor %}

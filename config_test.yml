@@ -1,0 +1,7 @@
+---
+- hosts: localhost
+  connection: local
+  become: yes
+  tasks:
+  - name: Python Os Sheell
+    shell: python3 test.py

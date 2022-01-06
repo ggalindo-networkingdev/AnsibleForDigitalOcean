@@ -1,0 +1,107 @@
+---
+
+- name: PROVISION DROPLETS
+  hosts: droplets
+  connection: ssh
+  gather_facts: no
+  become: yes
+  collections:
+    - kubernetes.core
+  vars:
+    ansible_ssh_private_key_file: /root/.ssh/ubuntu_rsa
+
+
+  tasks:
+
+    - name: Update repositorie for install python3
+      shell: "{{ item }}"
+      ignore_errors: yes
+      loop:
+        - sudo apt update
+        - sudo apt -y upgrade
+    - name: Install pip3 & Install VirtualBox
+      apt:
+        pkg:
+          - python3-pip
+          - virtualbox
+        state: present
+    
+    - name: Download minikube
+      get_url:
+        url: https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        dest: /usr/local/bin/minikube
+        mode: 755
+    
+    - name: Install Kubectl
+      shell: curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
+    
+    - name: Make the kubectl binary executable
+      shell: chmod +x ./kubectl
+    
+    - name: Move the binary in to PATH
+      shell: sudo mv ./kubectl /usr/local/bin/kubectl
+    
+    - name: Install bottle for Python 3.3 specifically, using the 'pip3.3' executable
+      pip:
+        name: ansible
+        executable: pip3
+    
+    - name: check the status of minikube.
+      command: minikube status
+      register: minikube_status
+      tags: minikube
+      changed_when: false
+      ignore_errors: true
+    
+    - name: debug minikube
+      debug: 
+         var: minikube_status
+      tags: minikube
+    
+    - name: Star minikube
+      tags: 
+       - star-minikube
+       - awx
+      command: minikube start --addons=ingress --cpus=4 --cni=flannel --install-addons=true --kubernetes-version=stable --memory=8g --force
+      when: "not minikube_status.stdout or 'Running' not in minikube_status.stdout"
+    
+    - name: Install AWX operator
+      shell: kubectl apply -f https://raw.githubusercontent.com/ansible/awx-operator/0.12.0/deploy/awx-operator.yaml
+      tags: awx
+    
+    - name: Copy file with owner and permissions
+      tags: awx
+      ansible.builtin.copy:
+        src: /home/ilana/ansible/digitalocean/ansible-awx.yml
+        dest: .
+
+    - name: Apply metrics-server manifest to the cluster.
+      tags: awx
+      command: kubectl apply -f ansible-awx.yml
+    
+    - name: AWX Pods Status
+      tags: awx
+      shell: kubectl get pods -l "app.kubernetes.io/managed-by=awx-operator"
+    
+    - name: Pause for 2 minutes to build app cache
+      tags: awx
+      pause:
+        minutes: 2
+      
+
+    - name: AWX service status
+      tags: awx
+      shell: kubectl get svc -l "app.kubernetes.io/managed-by=awx-operator"
+
+    - name: Kubect expose AWX
+      shell: kubectl expose deployment ansible-awx --type=LoadBalancer --port=8080
+      tags: 
+       - awx-access
+       - awx
+    
+    - name: Access AWX via tunnelling
+      tags: 
+       - awx-access
+       - awx
+      shell: nohup kubectl port-forward svc/ansible-awx-service  --address 0.0.0.0 30886:80
+

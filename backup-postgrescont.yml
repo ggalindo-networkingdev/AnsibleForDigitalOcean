@@ -1,0 +1,37 @@
+---
+
+- name: PROVISION DROPLETS
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  become: yes
+  collections:
+    - kubernetes.core
+    - community.docker
+
+
+  tasks:
+
+    - name: Docker Ps
+      shell: docker ps
+      ignore_errors: yes
+
+    - name: Test create directory
+      community.docker.docker_container_exec:
+        container: k8s_postgres_awx-demo-postgres-0_default_67561e08-cce6-4b53-a19c-5139eee0962b_1
+        command: /bin/bash  -c  "pip install -r /root/requirements.txt"
+      register: result
+      ignore_errors: yes
+
+    - name: Pg_Dump into container 
+      community.docker.docker_container_exec:
+        container: k8s_postgres_awx-demo-postgres-0_default_67561e08-cce6-4b53-a19c-5139eee0962b_1
+        command: /bin/bash  -c  "pg_dump -U awx awx > awx_bakcup2.sql"
+      register: result
+      ignore_errors: yes
+
+    - name: Check position
+      shell: ls
+      ignore_errors: yes
+    
+    

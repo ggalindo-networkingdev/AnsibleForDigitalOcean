@@ -1,0 +1,50 @@
+
+---
+
+- name: CREATE INTERVIEW DROPLET
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars:
+    droplets: 
+      - awx-ansible-test
+
+  tasks:
+
+    - name: Gather information about all images
+      community.digitalocean.digital_ocean_image_info:
+        image_type: all
+        oauth_token: 16567e32416953517be7d561031ea75ebcaae4b4a17cae0517ff0d3579ef835d
+      register: output 
+
+    - debug:
+        var: output
+
+
+    - name: Create a new Droplet
+      community.digitalocean.digital_ocean_droplet:
+        unique_name: yes
+        state: "{{state}}" # present = create , absent = delete
+        oauth_token: 16567e32416953517be7d561031ea75ebcaae4b4a17cae0517ff0d3579ef835d
+        name: "{{ item }}"
+        size: s-8vcpu-16gb
+        region: nyc1
+        image: ubuntu-20-04-x64
+        wait_timeout: 500
+        ssh_keys: ["31459421", "32076412"]
+      register: my_droplet
+      loop: "{{ droplets }}"
+  
+    - name: DISPLAY CREATED DROPLET
+      debug:
+        var: my_droplet
+
+    - name: CREATE INVENTORY
+      template:
+        src: inventory.j2
+        dest: inventory
+
+    
+
+

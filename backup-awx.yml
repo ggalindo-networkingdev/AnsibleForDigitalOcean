@@ -1,0 +1,72 @@
+---
+
+- name: PROVISION DROPLETS
+  hosts: droplets
+  connection: ssh
+  gather_facts: no
+  become: yes
+  collections:
+    - kubernetes.core
+    - community.docker
+  vars:
+    ansible_ssh_private_key_file: /root/.ssh/ubuntu_rsa
+
+
+  tasks:
+
+    - name: Docker Ps
+      shell: docker ps
+      ignore_errors: yes
+    
+    - name: Copy Requeriments.txt
+      ansible.builtin.copy:
+        src: /home/ilana/ansible/digitalocean/requirements.txt
+        dest: .
+
+    - name: Copy requirements File
+      shell: docker cp requirements.txt minikube:/root/
+      ignore_errors: yes
+
+    - name: Apt Update minikube
+      community.docker.docker_container_exec:
+        container: minikube
+        command: /bin/bash  -c  "sudo apt update"
+      register: result
+      ignore_errors: yes
+    
+    - name: Install Pip3 minikube
+      community.docker.docker_container_exec:
+        container: minikube
+        command: /bin/bash  -c  "sudo apt install -y python3-pip"
+      register: result
+      ignore_errors: yes
+    
+    - name: Install pip packages from requirements
+      community.docker.docker_container_exec:
+        container: minikube
+        command: /bin/bash  -c  "pip install -r /root/requirements.txt"
+      register: result
+      ignore_errors: yes
+    
+    - name: Copy Playbook for minikube
+      ansible.builtin.copy:
+        src: /home/ilana/ansible/digitalocean/backup-postgrescont.yml
+        dest: .
+    
+    - name: Copy requirements File
+      shell: docker cp backup-postgrescont.yml minikube:/root/
+      ignore_errors: yes
+
+    - name: Install Pip3 minikube
+      community.docker.docker_container_exec:
+        container: minikube
+        command: /bin/bash  -c  "ansible-playbook backup-postgrescont.yml -vvvv"
+      register: result
+      ignore_errors: yes
+    
+
+    - name: Check position
+      shell: ls
+      ignore_errors: yes
+    
+    

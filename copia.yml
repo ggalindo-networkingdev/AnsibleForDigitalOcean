@@ -1,0 +1,24 @@
+---
+- hosts: localhost
+  connection: local
+  become: yes
+  tasks:
+  - name: apt update
+    shell: sudo apt-get update
+  - name: Install VirtualBox
+    apt:
+      pkg:
+        - virtualbox
+      state: present
+  - name: Download minikube 
+    shell: wget https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+  - name: chmod minikube
+    shell: chmod +x minikube-linux-amd64
+  - name: Move minikube-linux-amd64 to user local/bin
+    shell: sudo mv minikube-linux-amd64 /usr/local/bin/minikube
+  - name: Install Kubectl
+    shell: curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
+  - name: Make the kubectl binary executable
+    shell: chmod +x ./kubectl
+  - name: Move the binary in to PATH
+    shell: sudo mv ./kubectl /usr/local/bin/kubectl
